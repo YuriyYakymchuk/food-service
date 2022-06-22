@@ -1,6 +1,8 @@
 package route
 
 import (
+	"fmt"
+	"food-service/config"
 	"food-service/controller"
 	"github.com/gorilla/mux"
 	"log"
@@ -20,5 +22,6 @@ func InitializeRoutes() {
 
 	r.HandleFunc("/api/hello/{name}", controller.GetGreeting).Methods("GET")
 
-	log.Fatal(http.ListenAndServe("localhost:8080", r))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%s",
+		config.Config.GetString("host", "localhost"), config.Config.GetString("port", "8080")), r))
 }
