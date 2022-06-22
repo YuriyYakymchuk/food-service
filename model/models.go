@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -25,10 +26,20 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+func (food Food) String() string {
+	return fmt.Sprintf("ID %d, UserID: %d, Name: %s, Price: %f, CreatedAt: %v, UpdatedAt: %v",
+		food.ID, food.UserID, food.Name, food.Price, food.CreatedAt, food.UpdatedAt)
+}
+
 func (Food) TableName() string {
 	return "Food"
 }
 
 func (User) TableName() string {
 	return "User"
+}
+
+func (user User) String() string {
+	return fmt.Sprintf("ID %d, First Name: %s, Last Name: %s, CreatedAt: %v, UpdatedAt: %v",
+		user.ID, user.FirstName, user.LastName, user.CreatedAt, user.UpdatedAt)
 }
