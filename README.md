@@ -1,6 +1,6 @@
 # food-service
 
-REST API service written on Go language for learning purposes
+REST API service written in Go language for learning purposes
 
 The service exposes the following API:
 ### Food
