@@ -2,8 +2,8 @@ package controller
 
 import (
 	"encoding/json"
-	"food-service/database"
-	"food-service/model"
+	"food-service/pkg/database"
+	"food-service/pkg/model"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
@@ -11,19 +11,35 @@ import (
 )
 
 const (
-	contentType     = "Content-Type"
-	applicationJSON = "application/json"
+	ContentType     = "Content-Type"
+	ApplicationJSON = "application/json"
 )
 
-func GetFoodOrders(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set(contentType, applicationJSON)
+func InitializeRoutes() *mux.Router {
+	r := mux.NewRouter()
+
+	r.HandleFunc("/api/food", getFoodOrders).Methods("GET")
+	r.HandleFunc("/api/food/{userId}", getFoodOrdersByUser).Methods("GET")
+	r.HandleFunc("/api/food", createFoodOrder).Methods("POST")
+	r.HandleFunc("/api/food", updateFoodOrder).Methods("PUT")
+	r.HandleFunc("/api/food/{id}", deleteFoodOrder).Methods("DELETE")
+
+	r.HandleFunc("/api/user", createUser).Methods("POST")
+
+	r.HandleFunc("/api/hello/{name}", getGreeting).Methods("GET")
+
+	return r
+}
+
+func getFoodOrders(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set(ContentType, ApplicationJSON)
 
 	var foodOrders []model.Food
 	database.DB.Find(&foodOrders)
 	json.NewEncoder(w).Encode(foodOrders)
 }
 
-func GetFoodOrdersByUser(w http.ResponseWriter, r *http.Request) {
+func getFoodOrdersByUser(w http.ResponseWriter, r *http.Request) {
 	setHeaders(w)
 
 	params := mux.Vars(r)
@@ -33,7 +49,7 @@ func GetFoodOrdersByUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(foodOrders)
 }
 
-func CreateFoodOrder(w http.ResponseWriter, r *http.Request) {
+func createFoodOrder(w http.ResponseWriter, r *http.Request) {
 	setHeaders(w)
 
 	var foodOrder model.Food
@@ -43,16 +59,16 @@ func CreateFoodOrder(w http.ResponseWriter, r *http.Request) {
 	foodOrder.UpdatedAt = time.Now()
 	if database.DB.Create(&foodOrder).Error != nil {
 		log.Printf("Failed to create the food order: %s", foodOrder)
-		error := model.Error{Message: "Failed to create the food order."}
+		message := model.Error{Message: "Failed to create the food order."}
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(error)
+		json.NewEncoder(w).Encode(message)
 		return
 	}
 
 	json.NewEncoder(w).Encode(foodOrder)
 }
 
-func UpdateFoodOrder(w http.ResponseWriter, r *http.Request) {
+func updateFoodOrder(w http.ResponseWriter, r *http.Request) {
 	setHeaders(w)
 
 	var foodOrder model.Food
@@ -61,16 +77,16 @@ func UpdateFoodOrder(w http.ResponseWriter, r *http.Request) {
 	foodOrder.UpdatedAt = time.Now()
 	if database.DB.Save(&foodOrder).Error != nil {
 		log.Printf("Failed to update the food order: %s", foodOrder)
-		error := model.Error{Message: "Failed to update the food order."}
+		message := model.Error{Message: "Failed to update the food order."}
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(error)
+		json.NewEncoder(w).Encode(message)
 		return
 	}
 
 	json.NewEncoder(w).Encode(foodOrder)
 }
 
-func DeleteFoodOrder(w http.ResponseWriter, r *http.Request) {
+func deleteFoodOrder(w http.ResponseWriter, r *http.Request) {
 	setHeaders(w)
 	params := mux.Vars(r)
 
@@ -78,16 +94,16 @@ func DeleteFoodOrder(w http.ResponseWriter, r *http.Request) {
 
 	if database.DB.Delete(&foodOrder, params["id"]).Error != nil {
 		log.Printf("Failed to delete the food order: %s", foodOrder)
-		error := model.Error{Message: "Failed to delete the food order."}
+		message := model.Error{Message: "Failed to delete the food order."}
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(error)
+		json.NewEncoder(w).Encode(message)
 		return
 	}
 
 	json.NewEncoder(w).Encode(foodOrder)
 }
 
-func CreateUser(w http.ResponseWriter, r *http.Request) {
+func createUser(w http.ResponseWriter, r *http.Request) {
 	setHeaders(w)
 
 	var user model.User
@@ -97,23 +113,31 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	user.UpdatedAt = time.Now()
 	if database.DB.Create(&user).Error != nil {
 		log.Printf("Failed to create the user: %s", user)
-		error := model.Error{Message: "Failed to create the user."}
+		message := model.Error{Message: "Failed to create the user."}
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(error)
+		json.NewEncoder(w).Encode(message)
 		return
 	}
 
 	json.NewEncoder(w).Encode(user)
 }
 
-func GetGreeting(w http.ResponseWriter, r *http.Request) {
+func getGreeting(w http.ResponseWriter, r *http.Request) {
 	setHeaders(w)
 
 	params := mux.Vars(r)
+
+	if len(params["name"]) < 2 {
+		log.Print("Name parameter is too short.")
+		message := model.Error{Message: "Name parameter should be bigger than two symbols."}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(message)
+		return
+	}
 
 	json.NewEncoder(w).Encode("Hello " + params["name"] + "!")
 }
 
 func setHeaders(w http.ResponseWriter) {
-	w.Header().Set(contentType, applicationJSON)
+	w.Header().Set(ContentType, ApplicationJSON)
 }
