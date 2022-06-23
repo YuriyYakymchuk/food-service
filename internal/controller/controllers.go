@@ -2,8 +2,8 @@ package controller
 
 import (
 	"encoding/json"
-	"food-service/pkg/database"
-	"food-service/pkg/model"
+	"food-service/internal/database"
+	"food-service/internal/model"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"

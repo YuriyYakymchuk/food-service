@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"food-service/pkg/config"
-	"food-service/pkg/controller"
-	"food-service/pkg/database"
+	"food-service/internal/config"
+	"food-service/internal/controller"
+	"food-service/internal/database"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"log"

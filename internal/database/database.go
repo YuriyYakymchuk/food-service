@@ -1,7 +1,7 @@
 package database
 
 import (
-	"food-service/pkg/config"
+	"food-service/internal/config"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
