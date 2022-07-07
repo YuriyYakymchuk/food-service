@@ -2,17 +2,21 @@ package controllers
 
 import (
 	"encoding/json"
-	"food-service/internal/database"
+	context2 "food-service/internal/context"
 	"food-service/internal/models"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
-	"time"
 )
 
 const (
 	ContentType     = "Content-Type"
 	ApplicationJSON = "application/json"
+
+	FailedToEncodeResponse = "Failed to encode response."
+	InternalServerError    = "Internal server error."
+	FailedToRetrieveOrders = "Failed to retrieve orders."
+	BadRequestPayload      = "Bad request payload."
 )
 
 func InitializeRoutes() *mux.Router {
@@ -24,6 +28,7 @@ func InitializeRoutes() *mux.Router {
 	r.HandleFunc("/api/food", updateFoodOrder).Methods("PUT")
 	r.HandleFunc("/api/food/{id}", deleteFoodOrder).Methods("DELETE")
 
+	r.HandleFunc("/api/user", getUsers).Methods("GET")
 	r.HandleFunc("/api/user", createUser).Methods("POST")
 
 	r.HandleFunc("/api/hello/{name}", getGreeting).Methods("GET")
@@ -34,9 +39,23 @@ func InitializeRoutes() *mux.Router {
 func getFoodOrders(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set(ContentType, ApplicationJSON)
 
-	var foodOrders []models.Food
-	database.DB.Find(&foodOrders)
-	json.NewEncoder(w).Encode(foodOrders)
+	service := context2.GetService()
+	if service == nil {
+		handleInternalServerError(w, InternalServerError)
+		return
+	}
+
+	orders, err := service.GetFoodOrders()
+	if err != nil {
+		handleInternalServerError(w, FailedToRetrieveOrders)
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(orders)
+	if err != nil {
+		handleInternalServerError(w, FailedToEncodeResponse)
+		return
+	}
 }
 
 func getFoodOrdersByUser(w http.ResponseWriter, r *http.Request) {
@@ -44,63 +63,138 @@ func getFoodOrdersByUser(w http.ResponseWriter, r *http.Request) {
 
 	params := mux.Vars(r)
 	var foodOrders []models.Food
-	database.DB.Where(map[string]interface{}{"UserID": params["userId"]}).Find(&foodOrders)
 
-	json.NewEncoder(w).Encode(foodOrders)
+	service := context2.GetService()
+	if service == nil {
+		handleInternalServerError(w, InternalServerError)
+		return
+	}
+
+	foodOrders, err := service.GetFoodOrderByUser(params["userId"])
+	if err != nil {
+		handleInternalServerError(w, FailedToRetrieveOrders)
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(foodOrders)
+	if err != nil {
+		handleInternalServerError(w, FailedToEncodeResponse)
+		return
+	}
 }
 
 func createFoodOrder(w http.ResponseWriter, r *http.Request) {
 	setHeaders(w)
 
 	var foodOrder models.Food
-	json.NewDecoder(r.Body).Decode(&foodOrder)
+	err := json.NewDecoder(r.Body).Decode(&foodOrder)
 
-	foodOrder.CreatedAt = time.Now()
-	foodOrder.UpdatedAt = time.Now()
-	if database.DB.Create(&foodOrder).Error != nil {
-		log.Printf("Failed to create the food order: %s", foodOrder)
-		message := models.Error{Message: "Failed to create the food order."}
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(message)
+	if err != nil {
+		handleBadRequest(w, BadRequestPayload)
 		return
 	}
 
-	json.NewEncoder(w).Encode(foodOrder)
+	service := context2.GetService()
+	if service == nil {
+		handleInternalServerError(w, InternalServerError)
+		return
+	}
+
+	err = service.CreateFoodOrder(&foodOrder)
+
+	if err != nil {
+		log.Printf("Failed to create the food order: %s", foodOrder)
+		handleInternalServerError(w, "Failed to create the food order.")
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(foodOrder)
+	if err != nil {
+		handleInternalServerError(w, FailedToEncodeResponse)
+		return
+	}
 }
 
 func updateFoodOrder(w http.ResponseWriter, r *http.Request) {
 	setHeaders(w)
 
 	var foodOrder models.Food
-	json.NewDecoder(r.Body).Decode(&foodOrder)
+	err := json.NewDecoder(r.Body).Decode(&foodOrder)
 
-	foodOrder.UpdatedAt = time.Now()
-	if database.DB.Save(&foodOrder).Error != nil {
-		log.Printf("Failed to update the food order: %s", foodOrder)
-		message := models.Error{Message: "Failed to update the food order."}
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(message)
+	if err != nil {
+		handleBadRequest(w, BadRequestPayload)
+	}
+
+	service := context2.GetService()
+	if service == nil {
+		handleInternalServerError(w, InternalServerError)
 		return
 	}
 
-	json.NewEncoder(w).Encode(foodOrder)
+	err = service.UpdateFoodOrder(&foodOrder)
+
+	if err != nil {
+		log.Printf("Failed to update the food order: %s", foodOrder)
+		handleRecordNotFound(w)
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(foodOrder)
+	if err != nil {
+		handleInternalServerError(w, FailedToEncodeResponse)
+		return
+	}
 }
 
 func deleteFoodOrder(w http.ResponseWriter, r *http.Request) {
 	setHeaders(w)
 	params := mux.Vars(r)
 
-	var foodOrder models.Food
+	service := context2.GetService()
+	if service == nil {
+		handleInternalServerError(w, InternalServerError)
+		return
+	}
 
-	if database.DB.Delete(&foodOrder, params["id"]).Error != nil {
-		log.Printf("Failed to delete the food order: %s", foodOrder)
-		message := models.Error{Message: "Failed to delete the food order."}
-		w.WriteHeader(http.StatusBadRequest)
+	foodOrder, err := service.DeleteFoodOrder(params["id"])
+	if err != nil {
+		log.Printf("Failed tp delete the food order with ID: %s", params["id"])
+		handleRecordNotFound(w)
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(foodOrder)
+	if err != nil {
+		handleInternalServerError(w, FailedToEncodeResponse)
+		return
+	}
+}
+
+func getUsers(w http.ResponseWriter, r *http.Request) {
+	setHeaders(w)
+
+	service := context2.GetService()
+	if service == nil {
+		message := models.Error{Message: "Internal server error."}
+		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(message)
 		return
 	}
 
-	json.NewEncoder(w).Encode(foodOrder)
+	users, err := service.GetUsers()
+	if err != nil {
+		message := models.Error{Message: "Failed to retrieve users."}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(message)
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(users)
+	if err != nil {
+		message := models.Error{Message: "Failed to encode response."}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(message)
+	}
 }
 
 func createUser(w http.ResponseWriter, r *http.Request) {
@@ -109,21 +203,21 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 	var user models.User
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
-		log.Printf("Bad request payload: %v", r.Body)
-		message := models.Error{
-			Message: "Bad request payload",
-		}
-
-		w.WriteHeader(http.StatusBadRequest)
-		err = json.NewEncoder(w).Encode(message)
-		if err != nil {
-			log.Printf("Failed to decode the message: %v", message)
-		}
-
+		handleBadRequest(w, BadRequestPayload)
 		return
 	}
 
-	if database.DB.Create(&user).Error != nil {
+	service := context2.GetService()
+	if service == nil {
+		message := models.Error{Message: "Internal server error."}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(message)
+		return
+	}
+
+	err = service.CreateUser(&user)
+
+	if err != nil {
 		log.Printf("Failed to create the user: %s", user)
 		message := models.Error{Message: "Failed to create the user."}
 		w.WriteHeader(http.StatusBadRequest)
@@ -139,7 +233,6 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Failed to encode the user: %v", user)
 	}
-
 }
 
 func getGreeting(w http.ResponseWriter, r *http.Request) {
@@ -160,4 +253,29 @@ func getGreeting(w http.ResponseWriter, r *http.Request) {
 
 func setHeaders(w http.ResponseWriter) {
 	w.Header().Set(ContentType, ApplicationJSON)
+}
+
+func handleBadRequest(w http.ResponseWriter, text string) {
+	log.Print(text)
+	message := models.Error{
+		Message: text,
+	}
+
+	w.WriteHeader(http.StatusBadRequest)
+	err := json.NewEncoder(w).Encode(message)
+	if err != nil {
+		log.Printf("Failed to decode the message: %v", message)
+	}
+}
+
+func handleInternalServerError(w http.ResponseWriter, message string) {
+	response := models.Error{Message: message}
+	w.WriteHeader(http.StatusInternalServerError)
+	json.NewEncoder(w).Encode(response)
+}
+
+func handleRecordNotFound(w http.ResponseWriter) {
+	response := models.Error{Message: "Record not found"}
+	w.WriteHeader(http.StatusNotFound)
+	json.NewEncoder(w).Encode(response)
 }

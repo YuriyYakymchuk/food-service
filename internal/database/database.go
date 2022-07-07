@@ -5,22 +5,21 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
+	"log"
 )
 
-var DB *gorm.DB
+func InitDB() (*gorm.DB, error) {
 
-func InitDB() {
-	var err error
-
-	DB, err = gorm.Open(mysql.Open(config.ConstructDataBaseConnectionString()), &gorm.Config{
+	db, err := gorm.Open(mysql.Open(config.ConstructDataBaseConnectionString()), &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{
 			SingularTable: true,
 		},
 	})
 
 	if err != nil {
-		panic(err)
-
-		panic("Failed to connect to DB")
+		log.Fatalln("Failed to initialize the DB")
+		return nil, err
 	}
+
+	return db, nil
 }

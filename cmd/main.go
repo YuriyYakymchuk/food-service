@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"food-service/internal/common"
 	"food-service/internal/config"
+	context2 "food-service/internal/context"
 	"food-service/internal/controllers"
 	"food-service/internal/database"
+	"food-service/internal/services"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"log"
@@ -56,11 +59,36 @@ func (impl *Impl) b() int64 {
 }
 
 func main() {
+	log.Print("Starting the food order service ...")
 
+	status, err := run()
+	if err != nil {
+		log.Print("Failed to start the service.")
+		os.Exit(status)
+	}
+}
+
+func run() (int, error) {
 	config.LoadProperties("resources/food.properties")
-	database.InitDB()
+
+	context2.CreateContext()
+
+	db, err := database.InitDB()
+	if err != nil {
+		return 1, err
+	}
+	context2.AddBean(common.DB, db)
+
+	service, err := services.NewService(db)
+	if err != nil {
+		return 1, err
+	}
+	context2.AddBean(common.Service, service)
+
 	r := controllers.InitializeRoutes()
 	startServer(r)
+
+	return 0, nil
 }
 
 func startServer(router *mux.Router) {
